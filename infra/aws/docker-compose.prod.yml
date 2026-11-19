@@ -1,0 +1,68 @@
+# Production stack on the EC2 instance. Stored in SSM and pulled by deploy.sh.
+# ${...} values come from the .env file that deploy.sh builds from SSM Parameter Store.
+# One CloudWatch log stream per service. No Go templates in this file: SSM rejects them.
+name: tri-mesure
+
+services:
+  db:
+    image: public.ecr.aws/docker/library/postgres:16-alpine
+    environment:
+      POSTGRES_USER: tri
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: tri_mesure
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tri -d tri_mesure"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    mem_limit: 300m
+    restart: unless-stopped
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: ${LOG_GROUP}
+        awslogs-stream: db
+
+  api:
+    image: ${API_IMAGE}
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tri:${POSTGRES_PASSWORD}@db:5432/tri_mesure
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/live')"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    mem_limit: 450m
+    restart: unless-stopped
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: ${LOG_GROUP}
+        awslogs-stream: api
+
+  web:
+    image: ${WEB_IMAGE}
+    ports:
+      - "80:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 64m
+    restart: unless-stopped
+    logging:
+      driver: awslogs
+      options:
+        awslogs-region: ${AWS_REGION}
+        awslogs-group: ${LOG_GROUP}
+        awslogs-stream: web
+
+volumes:
+  pgdata:

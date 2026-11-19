@@ -1,0 +1,30 @@
+{
+  "name": "tri-et-mesure",
+  "private": true,
+  "packageManager": "pnpm@10.34.6",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,magenta \"pnpm api:dev\" \"pnpm --filter web dev\"",
+    "api:sync": "uv sync --project apps/api",
+    "api:dev": "uv run --project apps/api uvicorn tri_mesure.main:app --reload --port 8000",
+    "db:migrate": "uv run --project apps/api --directory apps/api alembic upgrade head",
+    "gen": "uv run --project apps/api python -m tri_mesure.datagen.generate --out data/gold",
+    "eval": "uv run --project apps/api python -m tri_mesure.evaluation.run_eval",
+    "gen:api": "uv run --project apps/api python -m tri_mesure.export_openapi apps/web/openapi.json && pnpm --filter web gen:api",
+    "test": "pnpm test:api && pnpm --filter web test",
+    "test:api": "uv run --project apps/api --directory apps/api pytest",
+    "lint": "uv run --project apps/api --directory apps/api ruff check . && pnpm --filter web lint",
+    "vendor": "uv run --project apps/api python -m tri_mesure.tools.vendor_sim",
+    "aws:deploy": "bash infra/aws/deploy.sh",
+    "aws:start": "bash infra/aws/power.sh start",
+    "aws:stop": "bash infra/aws/power.sh stop",
+    "aws:status": "bash infra/aws/power.sh status"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

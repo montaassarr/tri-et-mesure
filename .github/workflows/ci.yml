@@ -1,0 +1,145 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      claude_eval:
+        description: "Also run the paid evaluation with Claude (needs ANTHROPIC_API_KEY secret)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.10"
+      - run: uv sync --frozen --python 3.12
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Type check (strict)
+        run: uv run mypy
+      - name: Architecture contracts (layers must not leak)
+        run: uv run lint-imports
+      - name: Tests (SQLite)
+        run: uv run pytest -q
+      - name: Evaluation gate (rules provider, free and deterministic)
+        working-directory: .
+        run: >
+          uv run --project apps/api python -m tri_mesure.evaluation.run_eval
+          --provider rules --dataset ci --min-macro-f1 0.75
+
+  postgres:
+    name: migrations + tests on PostgreSQL
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: tri
+          POSTGRES_PASSWORD: tri
+          POSTGRES_DB: tri_mesure
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U tri" --health-interval 3s --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://tri:tri@localhost:5432/tri_mesure
+      PGPASSWORD: tri
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.10"
+      - name: Migrate up, down, up
+        working-directory: apps/api
+        run: |
+          uv sync --frozen --python 3.12
+          uv run alembic upgrade head
+          uv run alembic downgrade base
+          uv run alembic upgrade head
+          uv run alembic check   # models and migrations must not drift apart
+      - name: Audit table refuses UPDATE and DELETE
+        run: |
+          psql -h localhost -U tri -d tri_mesure -c \
+            "INSERT INTO audit_events (seq, ts, actor, type, payload, prev_hash, hash)
+             VALUES (1, 't', 'ci', 'test', '{}', 'x', 'y')"
+          if psql -h localhost -U tri -d tri_mesure -c "UPDATE audit_events SET actor='evil'"; then
+            echo "UPDATE was allowed" && exit 1
+          fi
+          if psql -h localhost -U tri -d tri_mesure -c "DELETE FROM audit_events"; then
+            echo "DELETE was allowed" && exit 1
+          fi
+          echo "append-only trigger works"
+      - name: Full test suite on PostgreSQL (same tests as SQLite)
+        working-directory: apps/api
+        run: |
+          psql -h localhost -U tri -d tri_mesure -c "CREATE DATABASE tri_mesure_test"
+          uv run pytest -q
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://tri:tri@localhost:5432/tri_mesure_test
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Type check
+        run: pnpm --filter web typecheck
+      - name: Lint
+        run: pnpm --filter web lint
+      - name: Tests
+        run: pnpm --filter web test
+      - name: Build
+        run: pnpm --filter web build
+
+  terraform:
+    name: infrastructure code (AWS)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/aws
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  claude-eval:
+    if: github.event_name == 'workflow_dispatch' && inputs.claude_eval
+    runs-on: ubuntu-latest
+    needs: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.9.10"
+      - run: uv sync --frozen --python 3.12 --project apps/api
+      - name: Evaluate Claude on the held-out test set
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: >
+          uv run --project apps/api python -m tri_mesure.evaluation.run_eval
+          --provider anthropic --model claude-haiku-5-5 --dataset test
+          --json eval-results/claude-haiku-5-5.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: eval-results/

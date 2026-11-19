@@ -1,0 +1,71 @@
+#!/bin/bash
+# First boot: install Docker + Compose, add swap, install the deploy script and a systemd
+# unit that redeploys on every boot. The app itself is defined in SSM (${ssm_root}/compose).
+set -euxo pipefail
+
+dnf install -y docker
+systemctl enable --now docker
+
+# Docker Compose v2 plugin (not packaged on AL2023)
+mkdir -p /usr/libexec/docker/cli-plugins
+curl -fsSL -o /usr/libexec/docker/cli-plugins/docker-compose \
+  "https://github.com/docker/compose/releases/download/v2.32.4/docker-compose-linux-aarch64"
+chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+
+# 1 GiB swap: headroom for a 1 GiB instance running PostgreSQL + API + nginx
+if [ ! -f /swapfile ]; then
+  dd if=/dev/zero of=/swapfile bs=1M count=1024
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
+fi
+
+mkdir -p /opt/tri-mesure
+cat > /opt/tri-mesure/deploy.sh <<'DEPLOY'
+#!/bin/bash
+# Pull config + secrets from SSM, log in to ECR, (re)start the stack. Idempotent.
+set -euo pipefail
+cd /opt/tri-mesure
+REGION="${region}"
+REGISTRY="${registry}"
+
+aws ssm get-parameter --region "$REGION" --name "${ssm_root}/compose" \
+  --query Parameter.Value --output text > docker-compose.yml
+
+aws ssm get-parameters-by-path --region "$REGION" --path "${ssm_root}/env/" \
+  --with-decryption --query 'Parameters[*].[Name,Value]' --output text \
+  | while IFS=$'\t' read -r name value; do printf '%s=%s\n' "$${name##*/}" "$value"; done \
+  > .env.tmp
+chmod 600 .env.tmp && mv .env.tmp .env
+
+aws ecr get-login-password --region "$REGION" \
+  | docker login --username AWS --password-stdin "$REGISTRY"
+docker compose pull --quiet
+docker compose up -d --remove-orphans
+docker image prune -f
+echo "deployed at $(date -u +%FT%TZ)"
+DEPLOY
+chmod 700 /opt/tri-mesure/deploy.sh
+
+cat > /etc/systemd/system/tri-mesure.service <<'UNIT'
+[Unit]
+Description=Tri & Mesure (docker compose)
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/tri-mesure/deploy.sh
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable tri-mesure.service
+# First deploy may find no image yet (images are pushed after the infra exists): don't fail boot.
+systemctl start tri-mesure.service || true

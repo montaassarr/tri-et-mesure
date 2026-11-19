@@ -1,0 +1,43 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# node
+node_modules/
+dist/
+*.tsbuildinfo
+.vite/
+playwright-report/
+test-results/
+
+# terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!example.tfvars
+
+# local data
+*.db
+*.sqlite
+eval/results/
+.DS_Store
+
+# private conversation exports (personal job-search notes)
+conversation/
+
+# design reference images (not ours to publish)
+*.jpeg
+!docs/**/*.jpeg
