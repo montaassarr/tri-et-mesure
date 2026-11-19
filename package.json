@@ -14,10 +14,10 @@
     "test:api": "uv run --project apps/api --directory apps/api pytest",
     "lint": "uv run --project apps/api --directory apps/api ruff check . && pnpm --filter web lint",
     "vendor": "uv run --project apps/api python -m tri_mesure.tools.vendor_sim",
-    "aws:deploy": "bash infra/aws/deploy.sh",
-    "aws:start": "bash infra/aws/power.sh start",
-    "aws:stop": "bash infra/aws/power.sh stop",
-    "aws:status": "bash infra/aws/power.sh status"
+    "aws:deploy": "node infra/aws/run.mjs deploy.sh",
+    "aws:start": "node infra/aws/run.mjs power.sh start",
+    "aws:stop": "node infra/aws/run.mjs power.sh stop",
+    "aws:status": "node infra/aws/run.mjs power.sh status"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
