@@ -5,7 +5,8 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1  # Git Bash: do not rewrite /paths in AWS arguments
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$HERE/../.." && pwd)"
+# On Windows, a C:/... path: with MSYS_NO_PATHCONV, docker.exe and git.exe cannot read /c/... paths.
+ROOT="$(cd "$HERE/../.." && (pwd -W 2>/dev/null || pwd))"
 PROFILE="${AWS_PROFILE:-default}"
 TF="${TF:-$(command -v terraform || true)}"
 if [ -z "$TF" ]; then
