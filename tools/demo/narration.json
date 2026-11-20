@@ -1,0 +1,26 @@
+{
+  "voice": "fr-FR-HenriNeural",
+  "rate": "+4%",
+  "segments": [
+    { "id": "intro", "caption": "Tri & Mesure : l'IA propose, un humain décide, l'outil mesure.", "speech": "Tri et Mesure. L'IA propose, un humain décide, l'outil mesure." },
+    { "id": "roles", "caption": "Quatre métiers, quatre écrans. On commence par Sophie, gestionnaire sinistres." },
+    { "id": "queue", "caption": "Sa corbeille : les e-mails sinistres, les plus urgents d'abord." },
+    { "id": "rules", "caption": "Priorité et délai sont calculés par des règles lisibles, pas par l'IA." },
+    { "id": "open", "caption": "« Traiter le dossier suivant » ouvre le plus urgent. Ici, on ouvre un exemple.", "speech": "Traiter le dossier suivant ouvre le plus urgent. Ici, on ouvre un exemple." },
+    { "id": "case", "caption": "Un dossier : l'e-mail, la proposition de l'IA, et le contexte." },
+    { "id": "privacy", "caption": "Les données personnelles sont masquées avant d'être envoyées à l'IA." },
+    { "id": "source", "caption": "Chaque valeur renvoie au passage de l'e-mail qui la justifie." },
+    { "id": "contract", "caption": "À côté : le contrat et ses garanties, pour ne rien promettre à tort." },
+    { "id": "reply", "caption": "Et une réponse type, déjà remplie, à copier." },
+    { "id": "confirm", "caption": "Quand l'IA n'est pas sûre, Sophie doit confirmer : pas de validation par réflexe." },
+    { "id": "validate", "caption": "Elle valide. Le dossier suivant s'ouvre tout seul, et tout est tracé." },
+    { "id": "manager", "caption": "Inès, responsable d'équipe : stock, retards, et la valeur réelle de l'IA." },
+    { "id": "control", "caption": "La moitié des dossiers est traitée sans IA : c'est la référence qui prouve le gain." },
+    { "id": "storm", "caption": "Mode tempête : simuler une vague d'e-mails après un orage, et voir si l'équipe tient." },
+    { "id": "auditor", "caption": "Paul, auditeur : chaque action, humaine ou IA, est inscrite au journal." },
+    { "id": "chain", "caption": "Les entrées sont chaînées : une modification après coup se voit immédiatement." },
+    { "id": "aiteam", "caption": "Lucas, équipe IA : toutes les IA sont comparées sur les mêmes dossiers." },
+    { "id": "vendors", "caption": "N'importe quel fournisseur peut se brancher, et le meilleur devient le champion." },
+    { "id": "outro", "caption": "Tri & Mesure : prototype étudiant, données entièrement fictives.", "speech": "Tri et Mesure. Un prototype étudiant, avec des données entièrement fictives." }
+  ]
+}

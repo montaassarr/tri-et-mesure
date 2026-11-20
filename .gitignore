@@ -41,3 +41,6 @@ conversation/
 # design reference images (not ours to publish)
 *.jpeg
 !docs/**/*.jpeg
+
+# demo video work files (clips, raw recording, timings)
+tools/demo/out/
